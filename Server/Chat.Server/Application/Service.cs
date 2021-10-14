@@ -132,7 +132,7 @@ namespace Chat.Server.Application
             finally
             {
                 // Mostra mensagem avisando que a conexão foi fechada
-                Console.WriteLine($"Close connection to {handler.Client.RemoteEndPoint} with protocol error.");
+                Console.WriteLine($"Connection to {handler.Client.RemoteEndPoint} closed.");
 
                 // Fecha efetivamente a conexão. 
                 handler.Close();

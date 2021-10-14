@@ -1,9 +1,11 @@
-﻿using Newtonsoft.Json;
+﻿using Chat.Server.Dal.LocalJson.Attributes;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -68,14 +70,38 @@ namespace Chat.Server.Dal.LocalJson.Interfaces
         /// <returns></returns>
         public virtual async Task RemoveAsync(TModel model)
         {
+            model = await GetOneAsync(md =>
+            {
+                bool contains = false;
+                PropertyInfo property = null;
+                foreach (var item in typeof(TModel).GetProperties())
+                {
+                    object[] vs = item.GetCustomAttributes(typeof(PrimaryKeyAttribute), true);
+                    contains = vs.Length > 0;
+
+                    if (contains)
+                    {
+                        property = item;
+                        break;
+                    }
+                }
+
+                if (!contains)
+                    return false;
+
+                return property.GetValue(md) == property.GetValue(model);
+            });
+
             string json = JsonConvert.SerializeObject(model);
             byte[] encBytes = Encoding.GetBytes(json);
+            bool modified = false;
 
             for (int i = 1; i < FileLength; i++)
             {
                 bool equal = true;
                 byte[] buffer = new byte[DefaultBufferSize];
-                await FileStream.ReadAsync(buffer.AsMemory());
+                FileStream.Seek(i, SeekOrigin.Begin);
+                await FileStream.ReadAsync(buffer, 0, buffer.Length);
 
                 for (int j = 0; j < encBytes.Length; j++)
                 {
@@ -88,15 +114,58 @@ namespace Chat.Server.Dal.LocalJson.Interfaces
 
                 if (equal)
                 {
-                    buffer = new byte[encBytes.Length];
-                    FileStream.Seek(i, SeekOrigin.Current);
+                    int length = encBytes.Length;
+
+                    if (Buffer.Count() > 1)
+                        length++;
+
+                    buffer = new byte[length];
+                    FileStream.Seek(i, SeekOrigin.Begin);
                     await FileStream.WriteAsync(buffer.AsMemory());
+
+                    modified = true;
                     break;
                 }
             }
 
             await FileStream.FlushAsync();
-            Modified = true;
+            Modified = modified;
+        }
+        public async Task RemoveAllAsync(Func<TModel, bool> predicated)
+        {
+
+        }
+        protected internal async Task<string> GetAllTextAsync()
+        {
+            byte[] buffer = new byte[DefaultBufferSize];
+            int start = 0;
+
+            while ((await FileStream.ReadAsync(buffer.AsMemory(start))) != 0)
+            {
+
+            }
+
+            return Encoding.GetString(buffer);
+        }
+        protected internal async Task<IEnumerable<TModel>> GetAllJsonObjectsAsync()
+        {
+            if (!Modified)
+            {
+                if (Buffer != null)
+                    return Buffer;
+            }
+
+            string allText = await GetAllTextAsync();
+            IEnumerable<TModel> models = JsonConvert.DeserializeObject<IEnumerable<TModel>>(allText);
+
+            return models;
+        }
+        public async Task<IEnumerable<TModel>> GetAllAsync(Func<TModel, bool> predicated)
+        {
+            IEnumerable<TModel> all = await GetAllJsonObjectsAsync();
+            List<TModel> models = all.Where(predicated).ToList();
+
+            return models;
         }
         protected internal virtual bool UpdateBuffer()
         {

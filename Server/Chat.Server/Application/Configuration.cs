@@ -15,6 +15,7 @@ namespace Chat.Server.Application
         public string MongoConnectionString { get; set; }
         public string MongoDBName { get; set; }
         public string SqlConnectionString { get; set; }
+        public string LocalDBPath { get; set; }
         public Configuration()
         {
 
@@ -42,7 +43,8 @@ namespace Chat.Server.Application
                 $"Max Connections: {MaxConnections}\n" +
                 $"Response IP: {ResponseIP}\n" + 
                 $"Port: {Port}\n" +
-                $"Mongo Connection: {MongoConnectionString} | {MongoDBName}";
+                $"Mongo Connection: {MongoConnectionString} | {MongoDBName}\n" +
+                $"Local Database Path: {LocalDBPath}";
         }
     }
 }

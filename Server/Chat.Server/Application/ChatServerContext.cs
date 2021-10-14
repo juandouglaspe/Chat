@@ -64,11 +64,8 @@ namespace Chat.Server.Application
                 await LocalContext.ConnectedsUsers.RemoveAsync(cnUser);
             }
 
-            await LocalContext.ConnectedsUsers.AddAsync(new ConnectedUser()
-            {
-                Username = username,
-                LastUpdateTime = DateTime.UtcNow
-            });
+            cnUser = await (await connecteds.FindAsync(fn => fn.Username == username)).FirstAsync();
+            await LocalContext.ConnectedsUsers.AddAsync(cnUser);
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson;
+﻿using Chat.Server.Dal.LocalJson.Attributes;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using System;
 using System.Collections.Generic;
@@ -12,6 +13,7 @@ namespace Chat.Server.Dal.MongoDB.Models
     public class ConnectedUser
     {
         internal const string CollectionName = "ConnectedsUsers";
+        [PrimaryKey]
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; }
         [Required]

@@ -6,5 +6,6 @@
   "MongoDBName": "ChatServerDb",
   "Port": 5454,
   "ResponseIP": "localhost",
-  "SqlConnectionString": "Server=localhost\\MSSQLSERVER01;Database=ChatServer;Trusted_Connection=True;"
+  "SqlConnectionString": "Server=localhost\\MSSQLSERVER01;Database=ChatServer;Trusted_Connection=True;",
+  "LocalDBPath": "LocalData"
 }

@@ -22,14 +22,22 @@ namespace Chat.Server.Dal.LocalJson
                 InitializeFile(filePath);
             }
 
-            _fileStream = new(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            _fileStream = new(Path, FileMode.OpenOrCreate, FileAccess.ReadWrite);
             UpdateBuffer();
         }
 
         FileStream _fileStream;
         FileStream IAsyncJsonFile<TModel>.FileStream
         {
-            get => _fileStream;
+            get
+            {
+                if (_fileStream == null)
+                {
+                    _fileStream = new(Path, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+                }
+
+                return _fileStream;
+            }
             set => _fileStream = value;
         }
 
@@ -50,7 +58,7 @@ namespace Chat.Server.Dal.LocalJson
                 {
                     Thread th = new(() =>
                     {
-                        UpdateBuffer();
+                        _modified = !UpdateBuffer();
                     });
                     th.Start();
                     return;
@@ -62,7 +70,18 @@ namespace Chat.Server.Dal.LocalJson
         public int FileLength => (int)new FileInfo(Path).Length;
         IEnumerable<TModel> _buffer;
         private bool disposedValue;
-        IEnumerable<TModel> IAsyncJsonFile<TModel>.Buffer { get => _buffer; set => _buffer = value; }
+        IEnumerable<TModel> IAsyncJsonFile<TModel>.Buffer
+        {
+            get
+            {
+                while (_modified)
+                {
+                    Thread.Sleep(100);
+                }
+                return _buffer;
+            }
+            set => _buffer = value;
+        }
         string IAsyncJsonFile<TModel>.Path { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
 
@@ -79,18 +98,13 @@ namespace Chat.Server.Dal.LocalJson
         public async Task<TModel> GetOneAsync(Func<TModel, bool> predicate)
         {
             byte[] buffer = new byte[FileLength];
-            await _fileStream.ReadAsync(buffer.AsMemory());
-            string text = _encoding.GetString(buffer);
 
             if (_buffer != null)
             {
                 return _buffer.FirstOrDefault(predicate);
             }
 
-            TModel[] objs = await Task.Run(() =>
-            {
-                return (TModel[])JsonConvert.DeserializeObject(text);
-            });
+            IEnumerable<TModel> objs = await ((IAsyncJsonFile<TModel>)this).GetAllJsonObjectsAsync();
 
             return await Task.Run(() =>
             {
@@ -125,17 +139,43 @@ namespace Chat.Server.Dal.LocalJson
 
             _buffer ??= Array.Empty<TModel>();
 
-            byte[] buffer = new byte[IAsyncJsonFile<TModel>.DefaultBufferSize];
-            string text = string.Empty;
+            lock (_buffer)
+            {
+                byte[] buffer = new byte[IAsyncJsonFile<TModel>.DefaultBufferSize];
+                string text = string.Empty;
 
-            _fileStream.Flush();
+                _fileStream.Flush();
 
+                _fileStream.Seek(0, SeekOrigin.Begin);
+                _fileStream.Read(buffer, 0, buffer.Length);
 
-            _fileStream.Seek(0, SeekOrigin.Begin);
-            _fileStream.Read(buffer, 0, buffer.Length);
-            text = _encoding.GetString(buffer);
+                text = _encoding.GetString(buffer);
+                text = text.Replace("\0", string.Empty);
 
-            _buffer = JsonConvert.DeserializeObject<IEnumerable<TModel>>(text);
+                //Thread th = new(async () =>
+                //{
+                //    buffer = _encoding.GetBytes(text);
+
+                //    byte[] aux = new byte[_fileStream.Length];
+                //    Array.Copy(buffer, aux, buffer.Length);
+
+                //    bool reqUpdate = !aux.SequenceEqual(buffer);
+
+                //    if (reqUpdate)
+                //    {
+                //        _fileStream.Seek(0, SeekOrigin.Begin);
+                //        await _fileStream.WriteAsync(aux, 0, aux.Length);
+                //        await _fileStream.FlushAsync();
+
+                //        ((IAsyncJsonFile<TModel>)this).Modified = true;
+                //    }
+                //});
+
+                _buffer = JsonConvert.DeserializeObject<IEnumerable<TModel>>(text);
+
+                //th.Start();
+            }
+
             return true;
         }
 
@@ -145,7 +185,7 @@ namespace Chat.Server.Dal.LocalJson
             {
                 if (disposing)
                 {
-                    // TODO: dispose managed state (managed objects)
+                    _fileStream.Dispose();
                 }
 
                 // TODO: free unmanaged resources (unmanaged objects) and override finalizer
@@ -155,11 +195,11 @@ namespace Chat.Server.Dal.LocalJson
         }
 
         // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-        // ~AsyncJson()
-        // {
-        //     // Não altere este código. Coloque o código de limpeza no método 'Dispose(bool disposing)'
-        //     Dispose(disposing: false);
-        // }
+        ~AsyncJson()
+        {
+            // Não altere este código. Coloque o código de limpeza no método 'Dispose(bool disposing)'
+            Dispose(disposing: false);
+        }
 
         public void Dispose()
         {

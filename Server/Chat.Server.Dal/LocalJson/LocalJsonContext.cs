@@ -10,11 +10,18 @@ namespace Chat.Server.Dal.LocalJson
 {
     public class LocalJsonContext
     {
-        public LocalJsonContext(Encoding encoding)
+        public LocalJsonContext(Encoding encoding) : this(encoding, "Data")
         {
             ConnectedsUsers = new AsyncJson<ConnectedUser>(GetFileName<ConnectedUser>(), encoding);
         }
-        private string BasePath => $"{Environment.CurrentDirectory}\\Data\\";
+        public LocalJsonContext(Encoding encoding, string local)
+        {
+            ConnectedsUsers = new AsyncJson<ConnectedUser>(GetFileName<ConnectedUser>(), encoding);
+            BaseFolder = local;
+        }
+
+        private string BaseFolder;
+        private string BasePath => $"{Environment.CurrentDirectory}\\{BaseFolder}\\";
 
         public IAsyncJsonFile<ConnectedUser> ConnectedsUsers { get; set; }
 
